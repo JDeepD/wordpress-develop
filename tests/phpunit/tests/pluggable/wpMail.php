@@ -758,4 +758,18 @@ EOT;
 			'The text/html Content-Type header is not present.'
 		);
 	}
+
+	/**
+	 * @ticket 62940
+	 */
+	public function test_wp_mail_single_line_utf8_header() {
+		$headers = 'From: =?UTF-8?B?VGVzdA==?= <test@example.com>';
+		wp_mail( 'test@test.com', 'subject', 'message', $headers );
+
+		$mailer = tests_retrieve_phpmailer_instance();
+		// phpcs:disable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		$this->assertSame( 'test@example.com', $mailer->From );
+		$this->assertSame( 'Test', $mailer->FromName );
+		// phpcs:enable
+	}
 }
