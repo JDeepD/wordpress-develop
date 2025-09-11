@@ -722,7 +722,7 @@ EOT;
 			'The multipart/alternative header is not present.'
 	}
 
-	public function addressProvider() {
+	public function address_provider() {
 		return array(
 			'from encoded name'               => array(
 				'type'     => 'From',
@@ -794,7 +794,7 @@ EOT;
 
 	/**
 	 * @ticket 62940
-	 * @dataProvider addressProvider
+	 * @dataProvider address_provider
 	 */
 	public function test_wp_mail_single_line_utf8_header( $type, $header, $expected ) {
 		wp_mail( 'test@example.com', 'subject', 'message', $header );
@@ -837,5 +837,43 @@ EOT;
 			array( 'jane@example.com', 'Jane' ),
 		);
 		$this->assertSame( $expected, $mailer->getToAddresses() );
+	}
+
+	public function addr_list_provider() {
+		return array(
+			'comma in quoted name'          => array(
+				'type'     => 'From',
+				'header'   => 'From: "John, Doe" <johndoe@example.com>',
+				'expected' => array( 'johndoe@example.com', 'John, Doe' ),
+			),
+			'angled bracket in quoted name' => array(
+				'type'     => 'From',
+				'header'   => 'From: "John<Doe" <johndoe@example.com>',
+				'expected' => array( 'johndoe@example.com', 'John<Doe' ),
+			),
+		);
+	}
+
+
+	/**
+	 * @ticket 62940
+	 * @dataProvider addr_list_provider
+	 * @requires extension imap
+	 */
+	public function test_wp_mail_headers_with_imap_extension( $type, $header, $expected ) {
+		wp_mail( 'test@example.com', 'Subject', 'Message', $header );
+		$mailer = tests_retrieve_phpmailer_instance();
+
+		// phpcs:disable WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase
+		switch ( $type ) {
+			case 'From':
+				$this->assertSame( $expected, array( $mailer->From, $mailer->FromName ) );
+				break;
+
+			default:
+				$this->fail( "Unknown header type: {$type}" );
+				break;
+		}
+		// phpcs:enable
 	}
 }
