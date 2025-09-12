@@ -273,11 +273,10 @@ if ( ! function_exists( 'wp_mail' ) ) :
 			} else {
 				$tempheaders = $headers;
 			}
-			$headers = array();
+			$headers        = array();
+			$parsed_headers = array();
 
-			// If it's actually got contents.
 			if ( ! empty( $tempheaders ) ) {
-				// Iterate through the raw headers.
 				foreach ( (array) $tempheaders as $header ) {
 					if ( ! str_contains( $header, ':' ) ) {
 						if ( false !== stripos( $header, 'boundary=' ) ) {
@@ -290,7 +289,7 @@ if ( ! function_exists( 'wp_mail' ) ) :
 					list( $name, $content ) = explode( ':', trim( $header ), 2 );
 
 					// Cleanup crew.
-					$name    = trim( $name );
+					$name    = strtolower( trim( $name ) );
 					$content = trim( $content );
 
 					switch ( strtolower( $name ) ) {
@@ -308,12 +307,31 @@ if ( ! function_exists( 'wp_mail' ) ) :
 										$content_type = 'multipart/' . strtolower( $matches[1] ) . '; boundary="' . $boundary . '"';
 									}
 								}
+					$parsed_headers[ $name ] = $content;
+				}
 
-								// Avoid setting an empty $content_type.
-							} elseif ( '' !== trim( $content ) ) {
-								$content_type = trim( $content );
-							}
-							break;
+				/**
+				 * Set the charset from Content-Type, if present.
+				 */
+				if ( isset( $parsed_headers['content-type'] ) ) {
+					$content = $parsed_headers['content-type'];
+					if ( str_contains( $content, ';' ) ) {
+						list( $type, $charset_content ) = explode( ';', $content );
+						$content_type                   = trim( $type );
+						if ( false !== stripos( $charset_content, 'charset=' ) ) {
+							$charset = trim( str_replace( array( 'charset=', '"' ), '', $charset_content ) );
+						} elseif ( false !== stripos( $charset_content, 'boundary=' ) ) {
+							$boundary = trim( str_replace( array( 'BOUNDARY=', 'boundary=', '"' ), '', $charset_content ) );
+						}
+
+						// Avoid setting an empty $content_type.
+					} elseif ( '' !== trim( $content ) ) {
+						$content_type = trim( $content );
+					}
+				}
+
+				foreach ( $parsed_headers as $name => $content ) {
+					switch ( $name ) {
 						case 'from':
 							if ( ! empty( $content ) ) {
 								$addresses = $phpmailer->parseAddresses( $content, null, $charset );
@@ -340,6 +358,7 @@ if ( ! function_exists( 'wp_mail' ) ) :
 							break;
 					}
 				}
+				$parsed_headers = array();
 			}
 		}
 
