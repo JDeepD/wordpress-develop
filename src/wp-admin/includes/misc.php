@@ -1188,7 +1188,10 @@ function wp_check_locked_posts( $response, $data, $screen_id ) {
 /**
  * Checks lock status on the New/Edit Post screen and refresh the lock.
  *
+ * Additionally, send RTC status in heartbeat response.
+ *
  * @since 3.6.0
+ * @since 7.1.0 Added RTC status in heartbeat response.
  *
  * @param array  $response  The Heartbeat response.
  * @param array  $data      The $_POST data sent.
@@ -1235,6 +1238,11 @@ function wp_refresh_post_lock( $response, $data, $screen_id ) {
 		}
 
 		$response['wp-refresh-post-lock'] = $send;
+		$is_rtc_enabled = get_option( 'wp_collaboration_enabled', false );
+
+		if ( $is_rtc_enabled ) {
+			$response['wp-refresh-post-lock']['real_time_collaboration'] = true;
+		}
 	}
 
 	return $response;
