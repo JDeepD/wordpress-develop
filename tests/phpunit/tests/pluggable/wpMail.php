@@ -720,6 +720,7 @@ EOT;
 			'Content-Type: multipart/alternative;',
 			$mailer->get_sent()->header,
 			'The multipart/alternative header is not present.'
+		);
 	}
 
 	public function address_provider() {
@@ -805,12 +806,7 @@ EOT;
 					break;
 
 				case 'Reply-To':
-					// Reply-To returns associative array, so modify expected data accordingly.
-					$expected_reply_to = array();
-					foreach ( $expected as $addr ) {
-						$expected_reply_to[ $addr[0] ] = $addr;
-					}
-					$this->assertSame( $expected_reply_to, $mailer->getReplyToAddresses() );
+					$this->assertSame( $expected, $mailer->getReplyToAddresses() );
 					break;
 
 				default:

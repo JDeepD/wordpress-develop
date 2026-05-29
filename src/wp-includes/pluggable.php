@@ -251,7 +251,11 @@ if ( ! function_exists( 'wp_mail' ) ) :
 			};
 		}
 
-		// Process Headers First.
+		/*
+		 * Headers are processed before $to because PHPMailer::parseAddresses()
+		 * needs the charset (which may come from a Content-Type header) to
+		 * decode encoded display names in address fields.
+		 */
 		$cc       = array();
 		$bcc      = array();
 		$reply_to = array();
@@ -276,7 +280,14 @@ if ( ! function_exists( 'wp_mail' ) ) :
 			$headers        = array();
 			$parsed_headers = array();
 
+			// If it's actually got contents.
 			if ( ! empty( $tempheaders ) ) {
+				/*
+				 * First pass: split each raw header into name/content. Handle
+				 * Content-Type inline so $charset, $content_type and $boundary
+				 * are known before any address header is parsed. Everything
+				 * else is queued for the second pass.
+				 */
 				foreach ( (array) $tempheaders as $header ) {
 					if ( ! str_contains( $header, ':' ) ) {
 						if ( false !== stripos( $header, 'boundary=' ) ) {
@@ -289,52 +300,48 @@ if ( ! function_exists( 'wp_mail' ) ) :
 					list( $name, $content ) = explode( ':', trim( $header ), 2 );
 
 					// Cleanup crew.
-					$name    = strtolower( trim( $name ) );
+					$name    = trim( $name );
 					$content = trim( $content );
 
-					switch ( strtolower( $name ) ) {
-						// Mainly for legacy -- process a "From:" header if it's there.
-						case 'content-type':
-							if ( str_contains( $content, ';' ) ) {
-								list( $type, $charset_content ) = explode( ';', $content );
-								$content_type                   = trim( $type );
-								if ( false !== stripos( $charset_content, 'charset=' ) ) {
-									$charset = trim( str_replace( array( 'charset=', '"' ), '', $charset_content ) );
-								} elseif ( false !== stripos( $charset_content, 'boundary=' ) ) {
-									$boundary = trim( str_replace( array( 'BOUNDARY=', 'boundary=', '"' ), '', $charset_content ) );
-									$charset  = '';
-									if ( preg_match( '~^multipart/(\S+)~', $content_type, $matches ) ) {
-										$content_type = 'multipart/' . strtolower( $matches[1] ) . '; boundary="' . $boundary . '"';
-									}
+					if ( 'content-type' === strtolower( $name ) ) {
+						if ( str_contains( $content, ';' ) ) {
+							list( $type, $charset_content ) = explode( ';', $content );
+							$content_type                   = trim( $type );
+							if ( false !== stripos( $charset_content, 'charset=' ) ) {
+								$charset = trim( str_replace( array( 'charset=', '"' ), '', $charset_content ) );
+							} elseif ( false !== stripos( $charset_content, 'boundary=' ) ) {
+								$boundary = trim( str_replace( array( 'BOUNDARY=', 'boundary=', '"' ), '', $charset_content ) );
+								$charset  = '';
+								if ( preg_match( '~^multipart/(\S+)~', $content_type, $matches ) ) {
+									$content_type = 'multipart/' . strtolower( $matches[1] ) . '; boundary="' . $boundary . '"';
 								}
-					$parsed_headers[ $name ] = $content;
-				}
+							}
 
-				/**
-				 * Set the charset from Content-Type, if present.
-				 */
-				if ( isset( $parsed_headers['content-type'] ) ) {
-					$content = $parsed_headers['content-type'];
-					if ( str_contains( $content, ';' ) ) {
-						list( $type, $charset_content ) = explode( ';', $content );
-						$content_type                   = trim( $type );
-						if ( false !== stripos( $charset_content, 'charset=' ) ) {
-							$charset = trim( str_replace( array( 'charset=', '"' ), '', $charset_content ) );
-						} elseif ( false !== stripos( $charset_content, 'boundary=' ) ) {
-							$boundary = trim( str_replace( array( 'BOUNDARY=', 'boundary=', '"' ), '', $charset_content ) );
+							// Avoid setting an empty $content_type.
+						} elseif ( '' !== trim( $content ) ) {
+							$content_type = trim( $content );
 						}
-
-						// Avoid setting an empty $content_type.
-					} elseif ( '' !== trim( $content ) ) {
-						$content_type = trim( $content );
+						continue;
 					}
+
+					$parsed_headers[] = array( $name, $content );
 				}
 
-				foreach ( $parsed_headers as $name => $content ) {
-					switch ( $name ) {
+				/*
+				 * Second pass: parse address headers with the now-known charset.
+				 *
+				 * PHPMailer triggers an E_USER_NOTICE from parseSimplerAddresses() when
+				 * the IMAP extension is not installed. The simpler parser still works
+				 * for the common cases we care about (single-line, no quoted commas),
+				 * so the notice is suppressed at our call sites.
+				 */
+				foreach ( $parsed_headers as $entry ) {
+					list( $name, $content ) = $entry;
+
+					switch ( strtolower( $name ) ) {
 						case 'from':
-							if ( ! empty( $content ) ) {
-								$addresses = $phpmailer->parseAddresses( $content, null, $charset );
+							if ( '' !== $content ) {
+								$addresses = @$phpmailer->parseAddresses( $content, null, $charset );
 								if ( ! empty( $addresses[0]['name'] ) ) {
 									$from_name = $addresses[0]['name'];
 								}
@@ -344,21 +351,20 @@ if ( ! function_exists( 'wp_mail' ) ) :
 							}
 							break;
 						case 'cc':
-							$cc = array_merge( (array) $cc, $phpmailer->parseAddresses( $content, null, $charset ) );
+							$cc = array_merge( $cc, @$phpmailer->parseAddresses( $content, null, $charset ) );
 							break;
 						case 'bcc':
-							$bcc = array_merge( (array) $bcc, $phpmailer->parseAddresses( $content, null, $charset ) );
+							$bcc = array_merge( $bcc, @$phpmailer->parseAddresses( $content, null, $charset ) );
 							break;
 						case 'reply-to':
-							$reply_to = array_merge( (array) $reply_to, $phpmailer->parseAddresses( $content, null, $charset ) );
+							$reply_to = array_merge( $reply_to, @$phpmailer->parseAddresses( $content, null, $charset ) );
 							break;
 						default:
 							// Add it to our grand headers array.
-							$headers[ trim( $name ) ] = trim( $content );
+							$headers[ $name ] = $content;
 							break;
 					}
 				}
-				$parsed_headers = array();
 			}
 		}
 
@@ -366,10 +372,21 @@ if ( ! function_exists( 'wp_mail' ) ) :
 			$to = $atts['to'];
 		}
 
-		$raw_to = array();
+		/*
+		 * Keep $raw_to as the legacy array-of-strings form for the
+		 * `wp_mail_succeeded` / `wp_mail_failed` action payloads, and use
+		 * parseAddresses() output (in $to) for the actual send.
+		 */
 		if ( ! is_array( $to ) ) {
 			$raw_to = explode( ',', $to );
-			$to     = $phpmailer->parseAddresses( $to, null, $charset );
+			$to     = @$phpmailer->parseAddresses( $to, null, $charset );
+		} else {
+			$raw_to = $to;
+			$parsed = array();
+			foreach ( $to as $entry ) {
+				$parsed = array_merge( $parsed, @$phpmailer->parseAddresses( $entry, null, $charset ) );
+			}
+			$to = $parsed;
 		}
 
 		if ( isset( $atts['subject'] ) ) {
@@ -462,7 +479,10 @@ if ( ! function_exists( 'wp_mail' ) ) :
 		try {
 			$phpmailer->setFrom( $from_email, $from_name, false );
 		} catch ( PHPMailer\PHPMailer\Exception $e ) {
-			$mail_error_data                             = compact( 'to', 'subject', 'message', 'headers', 'attachments' );
+			$mail_error_data                             = array_merge(
+				array( 'to' => $raw_to ),
+				compact( 'subject', 'message', 'headers', 'attachments', 'embeds' )
+			);
 			$mail_error_data['phpmailer_exception_code'] = $e->getCode();
 
 			/** This filter is documented in wp-includes/pluggable.php */
@@ -626,7 +646,7 @@ if ( ! function_exists( 'wp_mail' ) ) :
 
 		$mail_data = array_merge(
 			array( 'to' => $raw_to ),
-			compact( 'subject', 'message', 'headers', 'attachments' )
+			compact( 'subject', 'message', 'headers', 'attachments', 'embeds' )
 		);
 
 		// Send!
