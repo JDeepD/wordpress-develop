@@ -612,7 +612,9 @@ tinymce.PluginManager.add( 'wordpress', function( editor ) {
 			'title|contenteditable|draggable|dropzone|hidden|spellcheck|translate],' + // Global attributes.
 			'i,' + // Don't replace <i> with <em> and <b> with <strong> and don't remove them when empty.
 			'b,' +
-			'script[src|async|defer|type|charset|crossorigin|integrity]'; // Add support for <script>.
+			'script[src|async|defer|type|charset|crossorigin|integrity],' + // Add support for <script>.
+			'iframe[src|name|width|height|longdesc|frameborder|marginwidth|marginheight|scrolling|align|' +
+			'sandbox|seamless|allowfullscreen|allow|referrerpolicy|loading]'; // Keep the attributes of embed codes.
 
 		editor.schema.addValidElements( validElementsSetting );
 
