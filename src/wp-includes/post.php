@@ -8197,10 +8197,15 @@ function clean_post_cache( $post ) {
 	/**
 	 * Fires immediately after the given post's cache is cleaned.
 	 *
+	 * The post object is read before the cache is cleaned, so it may contain the
+	 * values the post had before it was updated or deleted, such as the previous
+	 * post status. Use get_post() with the post ID to get the current values.
+	 *
 	 * @since 2.5.0
 	 *
 	 * @param int     $post_id Post ID.
-	 * @param WP_Post $post    Post object.
+	 * @param WP_Post $post    Post object as it was before the cache was cleaned.
+	 *                         It may contain outdated values.
 	 */
 	do_action( 'clean_post_cache', $post->ID, $post );
 
