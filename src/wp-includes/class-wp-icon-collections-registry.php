@@ -174,12 +174,7 @@ class WP_Icon_Collections_Registry {
 			return false;
 		}
 
-		$icons_registry = WP_Icons_Registry::get_instance();
-		foreach ( $icons_registry->get_registered_icons() as $icon ) {
-			if ( isset( $icon['collection'] ) && $icon['collection'] === $collection_slug ) {
-				$icons_registry->unregister( $icon['name'] );
-			}
-		}
+		WP_Icons_Registry::get_instance()->unregister_icons_in_collection( $collection_slug );
 
 		unset( $this->registered_collections[ $collection_slug ] );
 

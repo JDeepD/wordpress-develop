@@ -271,6 +271,21 @@ class WP_Icons_Registry {
 	}
 
 	/**
+	 * Unregisters all icons in a collection.
+	 *
+	 * @since 7.3.0
+	 *
+	 * @param string $collection Icon collection slug.
+	 */
+	public function unregister_icons_in_collection( $collection ) {
+		foreach ( $this->registered_icons as $icon_name => $icon ) {
+			if ( $icon['collection'] === $collection ) {
+				unset( $this->registered_icons[ $icon_name ] );
+			}
+		}
+	}
+
+	/**
 	 * Builds the allowed attribute list for wp_kses() from attribute names.
 	 *
 	 * @since 7.2.0

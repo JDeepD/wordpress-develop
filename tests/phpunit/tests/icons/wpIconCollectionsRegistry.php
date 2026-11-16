@@ -190,6 +190,50 @@ class Tests_Icons_WpIconCollectionsRegistry extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Unregistering a collection should not load the content of any icon.
+	 *
+	 * @ticket 66710
+	 *
+	 * @covers ::unregister
+	 */
+	public function test_unregister_collection_does_not_load_icon_files() {
+		$this->collections->register( 'plugin-a', array( 'label' => 'A' ) );
+		$this->collections->register( 'plugin-b', array( 'label' => 'B' ) );
+
+		$path = get_temp_dir() . 'icon-66710.svg';
+		file_put_contents( $path, '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"></svg>' );
+
+		$icons = WP_Icons_Registry::get_instance();
+		$this->register_icon(
+			'plugin-a/alpha',
+			array(
+				'label'     => 'Alpha',
+				'file_path' => $path,
+			)
+		);
+		$this->register_icon(
+			'plugin-b/gamma',
+			array(
+				'label'     => 'Gamma',
+				'file_path' => $path,
+			)
+		);
+
+		$this->collections->unregister( 'plugin-a' );
+
+		$property = new ReflectionProperty( WP_Icons_Registry::class, 'registered_icons' );
+		if ( PHP_VERSION_ID < 80100 ) {
+			$property->setAccessible( true );
+		}
+		$registered_icons = $property->getValue( $icons );
+
+		$icons->unregister( 'plugin-b/gamma' );
+		unlink( $path );
+
+		$this->assertArrayNotHasKey( 'content', $registered_icons['plugin-b/gamma'] );
+	}
+
+	/**
 	 * Should fail to unregister a collection that was never registered.
 	 *
 	 * @ticket 64847
