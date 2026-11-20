@@ -684,6 +684,7 @@ class WP_Query {
 	 * @since 5.3.0 Introduced the `$meta_type_key` parameter.
 	 * @since 6.1.0 Introduced the `$update_menu_item_cache` parameter.
 	 * @since 6.2.0 Introduced the `$search_columns` parameter.
+	 * @since 7.3.0 Added 'post_name' to the accepted `$search_columns` values.
 	 *
 	 * @param string|array $query {
 	 *     Optional. Array or string of Query parameters.
@@ -798,7 +799,8 @@ class WP_Query {
 	 *                                                   character used for exclusion can be modified using the
 	 *                                                   'wp_query_search_exclusion_prefix' filter.
 	 *     @type string[]        $search_columns         Array of column names to be searched. Accepts 'post_title',
-	 *                                                   'post_excerpt' and 'post_content'. Default empty array.
+	 *                                                   'post_excerpt', 'post_content' and 'post_name'. Default
+	 *                                                   empty array.
 	 *     @type int             $second                 Second of the minute. Default empty. Accepts numbers 0-59.
 	 *     @type bool            $sentence               Whether to search by phrase. Default false.
 	 *     @type bool            $suppress_filters       Whether to suppress filters. Default false.
@@ -1494,10 +1496,11 @@ class WP_Query {
 		/**
 		 * Filters the columns to search in a WP_Query search.
 		 *
-		 * The supported columns are `post_title`, `post_excerpt` and `post_content`.
-		 * They are all included by default.
+		 * The supported columns are `post_title`, `post_excerpt`, `post_content`
+		 * and `post_name`. All but `post_name` are included by default.
 		 *
 		 * @since 6.2.0
+		 * @since 7.3.0 Added support for the `post_name` column.
 		 *
 		 * @param string[] $search_columns Array of column names to be searched.
 		 * @param string   $search         Text being searched.
@@ -1506,7 +1509,7 @@ class WP_Query {
 		$search_columns = (array) apply_filters( 'post_search_columns', $search_columns, $query_vars['s'], $this );
 
 		// Use only supported search columns.
-		$search_columns = array_intersect( $search_columns, $default_search_columns );
+		$search_columns = array_intersect( $search_columns, array_merge( $default_search_columns, array( 'post_name' ) ) );
 		if ( empty( $search_columns ) ) {
 			$search_columns = $default_search_columns;
 		}

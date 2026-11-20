@@ -213,6 +213,88 @@ class Tests_Query_SearchColumns extends WP_UnitTestCase {
 	}
 
 	/**
+	 * Tests that search supports the `post_name` search column.
+	 *
+	 * @ticket 61008
+	 */
+	public function test_s_should_support_post_name_search_column() {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_status' => 'publish',
+				'post_title'  => 'qux title',
+				'post_name'   => 'quux-slug',
+			)
+		);
+
+		$q = new WP_Query(
+			array(
+				's'              => 'quux',
+				'search_columns' => array( 'post_name' ),
+				'fields'         => 'ids',
+			)
+		);
+
+		$this->assertSameSets( array( $post_id ), $q->posts );
+	}
+
+	/**
+	 * Tests that `post_name` is not searched by default.
+	 *
+	 * @ticket 61008
+	 */
+	public function test_s_should_not_search_post_name_by_default() {
+		self::factory()->post->create(
+			array(
+				'post_status' => 'publish',
+				'post_title'  => 'qux title',
+				'post_name'   => 'quux-slug',
+			)
+		);
+
+		$q = new WP_Query(
+			array(
+				's'      => 'quux',
+				'fields' => 'ids',
+			)
+		);
+
+		$this->assertStringNotContainsString( 'post_name', $q->request, "SQL request shouldn't contain post_name string." );
+		$this->assertSame( array(), $q->posts );
+	}
+
+	/**
+	 * Tests that the `post_search_columns` filter can add the `post_name` search column.
+	 *
+	 * @ticket 61008
+	 */
+	public function test_post_name_search_column_should_be_filterable() {
+		$post_id = self::factory()->post->create(
+			array(
+				'post_status' => 'publish',
+				'post_title'  => 'qux title',
+				'post_name'   => 'quux-slug',
+			)
+		);
+
+		add_filter(
+			'post_search_columns',
+			static function ( $search_columns ) {
+				$search_columns[] = 'post_name';
+				return $search_columns;
+			}
+		);
+
+		$q = new WP_Query(
+			array(
+				's'      => 'quux',
+				'fields' => 'ids',
+			)
+		);
+
+		$this->assertSameSets( array( $post_id ), $q->posts );
+	}
+
+	/**
 	 * Tests that search uses default search columns when using a non-existing search column.
 	 *
 	 * @ticket 43867
@@ -363,7 +445,7 @@ class Tests_Query_SearchColumns extends WP_UnitTestCase {
 			)
 		);
 
-		$this->assertStringNotContainsString( 'post_name', $q->request, "SQL request shouldn't contain post_name string." );
+		$this->assertStringNotContainsString( 'guid', $q->request, "SQL request shouldn't contain guid string." );
 		$this->assertSameSets( array( self::$pid1, self::$pid2, self::$pid3 ), $q->posts, 'Query results should be equal to the set.' );
 	}
 
@@ -376,7 +458,7 @@ class Tests_Query_SearchColumns extends WP_UnitTestCase {
 	 * @return string[] Array of column names to be searched.
 	 */
 	public function post_non_supported_search_column( $search_columns, $search, $wp_query ) {
-		$search_columns = array( 'post_name' );
+		$search_columns = array( 'guid' );
 		return $search_columns;
 	}
 
