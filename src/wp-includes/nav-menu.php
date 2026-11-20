@@ -604,9 +604,25 @@ function wp_update_nav_menu_item( $menu_id = 0, $menu_item_db_id = 0, $menu_item
 		$post['ID']          = $menu_item_db_id;
 		$post['post_status'] = ( 'draft' === $args['menu-item-status'] ) ? 'draft' : 'publish';
 
-		$update_post = wp_update_post( $post, true );
-		if ( is_wp_error( $update_post ) ) {
-			return $update_post;
+		$ignored_fields = array( 'ID', 'ping_status', 'post_type' );
+		if ( '' === $args['menu-item-post-date'] && '' === $args['menu-item-post-date-gmt'] ) {
+			$ignored_fields[] = 'post_date';
+		}
+
+		$current_post = get_post( $menu_item_db_id );
+		$has_changes  = false;
+		foreach ( array_diff_key( $post, array_flip( $ignored_fields ) ) as $field => $value ) {
+			if ( (string) wp_unslash( $value ) !== (string) $current_post->$field ) {
+				$has_changes = true;
+				break;
+			}
+		}
+
+		if ( $has_changes ) {
+			$update_post = wp_update_post( $post, true );
+			if ( is_wp_error( $update_post ) ) {
+				return $update_post;
+			}
 		}
 	}
 

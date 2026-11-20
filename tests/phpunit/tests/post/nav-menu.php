@@ -1624,4 +1624,75 @@ class Tests_Post_Nav_Menu extends WP_UnitTestCase {
 			'Trashed item hidden by the $menu->count > 0 gate.'
 		);
 	}
+
+	/**
+	 * Saving a menu item without changes should not update its post.
+	 *
+	 * @ticket 36891
+	 *
+	 * @covers ::wp_update_nav_menu_item
+	 */
+	public function test_wp_update_nav_menu_item_skips_post_update_when_unchanged() {
+		$args = array(
+			'menu-item-type'        => 'custom',
+			'menu-item-title'       => 'Example',
+			'menu-item-url'         => 'https://example.com/',
+			'menu-item-description' => 'Description',
+			'menu-item-attr-title'  => 'Attribute title',
+			'menu-item-status'      => 'publish',
+			'menu-item-position'    => 1,
+		);
+
+		$item_id = wp_update_nav_menu_item( $this->menu_id, 0, $args );
+		wp_update_post(
+			array(
+				'ID'            => $item_id,
+				'post_date'     => '2020-01-01 00:00:00',
+				'post_date_gmt' => '2020-01-01 00:00:00',
+			)
+		);
+
+		$pre_post_update = new MockAction();
+		add_action( 'pre_post_update', array( $pre_post_update, 'action' ) );
+
+		$this->assertSame( $item_id, wp_update_nav_menu_item( $this->menu_id, $item_id, $args ) );
+		$this->assertSame( 0, $pre_post_update->get_call_count(), 'The menu item post should not be updated.' );
+		$this->assertSame( '2020-01-01 00:00:00', get_post( $item_id )->post_date, 'The menu item date should not change.' );
+	}
+
+	/**
+	 * Saving a menu item with changes should still update its post.
+	 *
+	 * @ticket 36891
+	 *
+	 * @covers ::wp_update_nav_menu_item
+	 */
+	public function test_wp_update_nav_menu_item_updates_post_when_changed() {
+		$args = array(
+			'menu-item-type'     => 'custom',
+			'menu-item-title'    => 'Example',
+			'menu-item-url'      => 'https://example.com/',
+			'menu-item-status'   => 'publish',
+			'menu-item-position' => 1,
+		);
+
+		$item_id = wp_update_nav_menu_item( $this->menu_id, 0, $args );
+
+		$fields = array(
+			'menu-item-title'       => 'Changed title',
+			'menu-item-description' => 'Changed description',
+			'menu-item-position'    => 2,
+			'menu-item-status'      => 'draft',
+		);
+		foreach ( $fields as $field => $value ) {
+			$args[ $field ] = $value;
+			wp_update_nav_menu_item( $this->menu_id, $item_id, $args );
+		}
+
+		$post = get_post( $item_id );
+		$this->assertSame( 'Changed title', $post->post_title );
+		$this->assertSame( 'Changed description', $post->post_content );
+		$this->assertSame( 2, $post->menu_order );
+		$this->assertSame( 'draft', $post->post_status );
+	}
 }
